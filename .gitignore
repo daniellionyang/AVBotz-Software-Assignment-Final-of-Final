@@ -231,7 +231,7 @@ void enginesetHeight(int PID){
 
 void output(){
     //Sets Delay of Program (represents how often the input is read in real life)
-    sleep_for(milliseconds(10));
+    sleep_for(milliseconds(20));
     
     //Outputs Simulation
     cout << " " << stopwatch;
@@ -429,13 +429,13 @@ int main(){
     int number2 = 0;
     integral.height=0;
     while(number2!=5){
+        adjustheight();
         if((int)state.height.back()==desiredheight){
             number2++;
         }
         else{
             number2=0;
         }
-        adjustheight();
     }
     //Outputs the result of the Program
     if(win == 1){
