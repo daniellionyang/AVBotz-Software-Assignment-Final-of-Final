@@ -231,7 +231,7 @@ void enginesetHeight(int PID){
 
 void output(){
     //Sets Delay of Program (represents how often the input is read in real life)
-    sleep_for(milliseconds(1));
+    sleep_for(milliseconds(10));
     
     //Outputs Simulation
     cout << " " << stopwatch;
