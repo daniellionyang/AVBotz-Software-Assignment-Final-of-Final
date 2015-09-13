@@ -1,28 +1,448 @@
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <chrono>
+#include <thread>
+#include <math.h>
+using namespace std;
+using namespace std::this_thread;
+using namespace std::chrono;
 
-# Precompiled Headers
-*.gch
-*.pch
+//Initializes Variables
+int enginepower[4];
+int toggleengine = 0;
+double PIDPitch;
+double PIDRoll;
+double PIDHeight;
+void setFR(int a){
+    enginepower[1]=a;
+}
+void setFL(int a){
+    enginepower[0]=a;
+}
+void setBR(int a){
+    enginepower[2]=a;
+}
+void setBL(int a){
+    enginepower[3]=a;
+}
+double initialpitch = 0;
+double initialroll = 0;
+int stopwatch = 1;
+int initialheight;
+int thrust;
+int mass;
+int desiredheight;
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
+//Initializes Structs
+struct r{
+    double pitch;
+    double roll;
+    double height;
+};
+r velocity;
+struct s{
+    vector < double > pitcharray;
+    vector < double > rollarray;
+    vector < double > height;
+};
+s state;
+struct q{
+    double pitch;
+    double roll;
+    double height;
+};
+q integral;
+struct o{
+    double pitch;
+    double roll;
+    double height;
+};
+o derivative;
+double getPitch(){
+    return state.pitcharray.back();
+}
+double getRoll(){
+    return state.rollarray.back();
+}
+double getHeight(){
+    return state.height.back();
+}
 
-# Fortran module files
-*.mod
+void updateheight(){
+    //Update Function for Height
+    velocity.height+=((double)enginepower[2]+enginepower[3]+enginepower[0]+enginepower[1]-10*mass)/100;
+    state.height.push_back(getHeight()+velocity.height);
+    integral.height+=desiredheight-getHeight();
+    derivative.height = (desiredheight-getHeight())-(desiredheight-state.height[state.height.size()-2]);
+}
 
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
+void update(){
+    //Updates velocity from engine power value and using velocity values, updates pitch and roll
+    velocity.pitch+=((double)enginepower[2]+enginepower[3]-enginepower[0]-enginepower[1])/100;
+    velocity.roll+=((double)enginepower[3]+enginepower[0]-enginepower[1]-enginepower[2])/100;
+    state.pitcharray.push_back(getPitch()+velocity.pitch);
+    state.rollarray.push_back(getRoll()+velocity.roll);
+    
+    //Integral control (Only runs when toggled)
+    if(toggleengine==0){
+        integral.pitch-=getPitch();
+    }
+    if(toggleengine==1){
+        integral.roll-=getRoll();
+    }
+    
+    //Derivative control
+    derivative.pitch = (0-getPitch())-(0-state.pitcharray[state.pitcharray.size()-2]);
+    derivative.roll = (0-getRoll())-(0-state.rollarray[state.pitcharray.size()-2]);
+}
 
-# Executables
-*.exe
-*.out
-*.app
+void enginesetPitch(int PID){
+    //Sets the engine value to fix pitch (only runs when pitch is 0)
+    setFL(thrust);
+    setFR(thrust);
+    setBL(thrust);
+    setBR(thrust);
+    if(PID < 0){
+        int a = thrust+(int)(abs(PID)/2);
+        int b = thrust-(int)(abs(PID)/2);
+        if(a > thrust+min(255-thrust,thrust)){
+            a = thrust+min(255-thrust,thrust);
+        }
+        if(a < thrust-min(255-thrust,thrust)){
+            a = thrust-min(255-thrust,thrust);
+        }
+        if(b > thrust+min(255-thrust,thrust)){
+            b = thrust+min(255-thrust,thrust);
+        }
+        if(b < thrust-min(255-thrust,thrust)){
+            b = thrust-min(255-thrust,thrust);
+        }
+        setFL(a);
+        setFR(a);
+        setBL(b);
+        setBR(b);
+    }
+    if(PID > 0){
+        int a = thrust+(int)(abs(PID)/2);
+        int b = thrust-(int)(abs(PID)/2);
+        if(a > thrust+min(255-thrust,thrust)){
+            a = thrust+min(255-thrust,thrust);
+        }
+        if(a < thrust-min(255-thrust,thrust)){
+            a = thrust-min(255-thrust,thrust);
+        }
+        if(b > thrust+min(255-thrust,thrust)){
+            b = thrust+min(255-thrust,thrust);
+        }
+        if(b < thrust-min(255-thrust,thrust)){
+            b = thrust-min(255-thrust,thrust);
+        }
+        setBL(a);
+        setBR(a);
+        setFL(b);
+        setFR(b);
+    }
+}
+
+void enginesetRoll(int PID){
+    //Sets the engine value to fix roll (only runs when pitch is 0)
+    setFL(thrust);
+    setFR(thrust);
+    setBL(thrust);
+    setBR(thrust);
+    if(PID > 0){
+        int a = thrust+(int)(abs(PID)/2);
+        int b = thrust-(int)(abs(PID)/2);
+        if(a > thrust+min(255-thrust,thrust)){
+            a = thrust+min(255-thrust,thrust);
+        }
+        if(a < thrust-min(255-thrust,thrust)){
+            a = thrust-min(255-thrust,thrust);
+        }
+        if(b > thrust+min(255-thrust,thrust)){
+            b = thrust+min(255-thrust,thrust);
+        }
+        if(b < thrust-min(255-thrust,thrust)){
+            b = thrust-min(255-thrust,thrust);
+        }
+        setFL(a);
+        setBL(a);
+        setFR(b);
+        setBR(b);
+    }
+    if(PID < 0){
+        int a = thrust+(int)(abs(PID)/2);
+        int b = thrust-(int)(abs(PID)/2);
+        if(a > thrust+min(255-thrust,thrust)){
+            a = thrust+min(255-thrust,thrust);
+        }
+        if(a < thrust-min(255-thrust,thrust)){
+            a = thrust-min(255-thrust,thrust);
+        }
+        if(b > thrust+min(255-thrust,thrust)){
+            b = thrust+min(255-thrust,thrust);
+        }
+        if(b < thrust-min(255-thrust,thrust)){
+            b = thrust-min(255-thrust,thrust);
+        }
+        setFL(b);
+        setBL(b);
+        setFR(a);
+        setBR(a);
+    }
+    
+}
+
+void enginesetHeight(int PID){
+    //Sets the engine value to fix roll (only runs when pitch is 0)
+    setFL(thrust);
+    setFR(thrust);
+    setBL(thrust);
+    setBR(thrust);
+    
+    if(PID > 0){
+        int a =thrust+(PID/10);
+        if(a>255){
+            a=255;
+        }
+        if(a<0){
+            a=0;
+        }
+        setFL(a);
+        setBL(a);
+        setFR(a);
+        setBR(a);
+    }
+    if(PID < 0){
+        int a =thrust+(PID/10);
+        if(a>255){
+            a=255;
+        }
+        if(a<0){
+            a=0;
+        }
+        setFL(a);
+        setBL(a);
+        setFR(a);
+        setBR(a);
+    }
+}
+
+void output(){
+    //Sets Delay of Program (represents how often the input is read in real life)
+    sleep_for(milliseconds(1));
+    
+    //Outputs Simulation
+    cout << " " << stopwatch;
+    for(int x = 0; x< 9-((int)log10(stopwatch)+1); x++){
+        cout << " ";
+    }
+    int q = 0;
+    int a;
+    a= abs((int)getPitch());
+    if((int)getPitch()<0){
+        q=1;
+    }
+    cout  << (int) getPitch();
+    if(a==0){
+        a=1;
+    }
+    for(int x = 0; x< 9-q-((int)log10(a)+1); x++){
+        cout << " ";
+    }
+    q = 0;
+    a = abs((int)getRoll());
+    if((int)getRoll()<0){
+        q = 1;
+    }
+    cout  << (int) getRoll();
+    if(a==0){
+        a=1;
+    }
+    for(int x = 0; x< 8-q-((int)log10(a)+1); x++){
+        cout << " ";
+    }
+    q = 0;
+    a = abs((int)enginepower[0]);
+    if(enginepower[0]<0){
+        q = 1;
+    }
+    cout  << enginepower[0];
+    if(a==0){
+        a=1;
+    }
+    for(int x = 0; x< 9-q-((int)log10(a)+1); x++){
+        cout << " ";
+    }
+    q = 0;
+    a = abs((int)enginepower[1]);
+    if(enginepower[1]<0){
+        q = 1;
+    }
+    cout  << enginepower[1];
+    if(a==0){
+        a=1;
+    }
+    for(int x = 0; x< 9-q-((int)log10(a)+1); x++){
+        cout << " ";
+    }
+    q = 0;
+    a = abs((int)enginepower[2]);
+    if(enginepower[2]<0){
+        q = 1;
+    }
+    cout  << enginepower[2];
+    if(a==0){
+        a=1;
+    }
+    for(int x = 0; x< 9-((int)log10(a)+1)-q; x++){
+        cout << " ";
+    }
+    cout << enginepower[3];
+    a =abs((int)enginepower[3]);
+    if(a==0){
+        a=1;
+    }
+    for(int x = 0; x< 9-((int)log10(a)+1)-q; x++){
+        cout << " ";
+    }
+    int h = getHeight();
+    if((int)getHeight()<0){
+        h = 0;
+    }
+    cout << h << endl;
+}
+void PIDchange(int a, double b, int c){
+    //Gives values to PIDPitch and PIDRoll
+    int x = b*integral.pitch;
+    PIDPitch=a*(0-getPitch())+x+c*derivative.pitch;
+    x =b*integral.roll;
+    PIDRoll=a*(0-getRoll())+x+c*derivative.roll;
+    x =b*integral.height;
+    PIDHeight=a*(desiredheight-getHeight())+x+c*derivative.height;
+}
+
+void adjust(){
+    //Auxillary function that sets the PID coefficients and runs the engine controllling functions
+    update();
+    PIDchange(10, 1, 50);
+    if(toggleengine==0){
+        enginesetPitch(PIDPitch);
+    }
+    else{
+        enginesetRoll(PIDRoll);
+    }
+    output();
+    stopwatch++;
+}
+
+void adjustheight(){
+    //Auxillary function that sets the PID coefficients and runs the engine controllling functions
+    updateheight();
+    PIDchange(10, 1, 150);
+    enginesetHeight(PIDHeight);
+    output();
+    stopwatch++;
+}
+
+int main(){
+    //Initial inputs
+    cout << "Initial Pitch: Range->[-127,127]   ";
+    cin >> initialpitch;
+    if(initialpitch<-127||initialpitch>127){
+        cout << "Error: Parameter wasn't in range. Program terminated.";
+        return 0;
+    }
+    cout << "Initial Roll: Range->[-127,127]    ";
+    cin >> initialroll;
+    if(initialroll<-127||initialroll>127){
+        cout << "Error: Parameter wasn't in range. Program terminated.";
+        return 0;
+    }
+    cout << "Initial Height: Range->[0,255]     ";
+    cin >> initialheight;
+    if(initialheight<0||initialheight>255){
+        cout << "Error: Parameter wasn't in range. Program terminated.";
+        return 0;
+    }
+    cout << "Desired Height: Range->[0,255]     ";
+    cin >> desiredheight;
+    if(desiredheight<0||desiredheight>255){
+        cout << "Error: Parameter wasn't in range. Program terminated.";
+        return 0;
+    }
+    cout << "Mass of Quadrocopter: (To calculate thrust needed to maintain initial height) Range->[50,80]   ";
+    cin >> mass;
+    if(mass<50||mass>80){
+        cout << "Error: Parameter wasn't in range. Program terminated.";
+        return 0;
+    }
+    thrust=(int)mass*10/4;
+    cout <<"Time"<< "     "<<"Pitch" << "    " << "Roll" << "     " << "FL" << "       " << "FR" << "       " << "BL" << "       "<<"BR" << "    " << "Height" << endl;
+    state.pitcharray.push_back(initialpitch);
+    state.pitcharray.push_back(initialpitch);
+    state.rollarray.push_back(initialroll);
+    state.rollarray.push_back(initialroll);
+    state.height.push_back(initialheight);
+    state.height.push_back(initialheight);
+    //Main Loop to fix Pitch and Roll
+    int win = 1;
+    int counter = 0;
+    while(counter!=10){
+        if((int)state.pitcharray.back()==0 && (int)state.rollarray.back()==0){
+            counter++;
+        }
+        else{
+            counter = 0;
+        }
+        int number=0;
+        int number1 = 0;
+        toggleengine = 0;
+        integral.pitch=0;
+        integral.roll=0;
+        while(number1!=5){
+            adjust();
+            if((int)state.pitcharray.back()==0){
+                number++;
+            }
+            else{
+                number = 0;
+            }
+            if(number==10){
+                toggleengine = 1;
+            }
+            if ((int)state.rollarray.back()==0){
+                number1++;
+            }
+            else{
+                number1=0;
+            }
+            //Checks if the Pitch or Roll is too great and sets "win" to zero if the Pitch or ROll is too big
+            if(abs((int)state.pitcharray.back())>127 || abs((int)state.rollarray.back())>127){
+                cout << endl << "Your Pitch or Roll is too great!" << endl;
+                win = 0;
+            }
+        }
+    }
+    //Main Loop to fix Height
+    int number2 = 0;
+    integral.height=0;
+    while(number2!=5){
+        if((int)state.height.back()==desiredheight){
+            number2++;
+        }
+        else{
+            number2=0;
+        }
+        adjustheight();
+    }
+    //Outputs the result of the Program
+    if(win == 1){
+        cout << "Success!" << endl;
+    }
+    else{
+        cout << endl << "The Pitch or Roll was too big at some point." << endl;
+    }
+    cout << endl << "Time: " << stopwatch;
+}
